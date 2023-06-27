@@ -2,24 +2,30 @@
 name: E2E Nightly
 
 on:
+  push:
+    branches:
+      - "e2e"
   workflow_dispatch:
     inputs:
       branch:
-        description: 'Branch to run tests from. Defaults to redhat-3.6'
+        description: 'Branch to run tests from. Defaults to redhat-3.10'
         required: false
       tag:
-        description: 'quay-operator-index tag. Defaults to 3.6-unstable'
+        description: 'quay-operator-index tag. Defaults to 3.10-unstable'
         required: false
   schedule:
     - cron: '30 5 * * *'
 
 jobs:
   deploy:
+    strategy:
+      matrix:
+        platform: [ppc64le]
     name: Deploy the operator
     runs-on: 'ubuntu-latest'
     env:
-      BRANCH: ${{ github.event.inputs.branch || 'redhat-3.6' }}
-      TAG: ${{ github.event.inputs.tag || '3.6-unstable' }}
+      BRANCH: ${{ github.event.inputs.branch || 'redhat-3.10' }}
+      TAG: ${{ github.event.inputs.tag || '3.10-unstable' }}
       CATALOG_PATH: ./bundle/quay-operator.catalogsource.yaml
       OG_PATH: ./bundle/quay-operator.operatorgroup.yaml
       SUBSCRIPTION_PATH: ./bundle/quay-operator.subscription.yaml
@@ -49,11 +55,11 @@ jobs:
 
       - name: setup kubeconfig
         run: |
-          printf "${{ secrets.KUBE_CONFIG }}" | base64 --decode > "${KUBECONFIG}"
+          printf "${{ secrets.KUBE_CONFIG_PPC64LE }}" | base64 --decode > "${KUBECONFIG}"
 
       - name: deploy
         env:
-          CATALOG_IMAGE: quay.io/projectquay/quay-operator-index:${{ env.TAG }}
+          CATALOG_IMAGE: quay.io/projectquay/quay-operator-index:${{ env.TAG }}-${{ matrix.platform }}
         run: ./hack/deploy.sh
 
       - name: E2E Tests
@@ -65,15 +71,15 @@ jobs:
         if: always()
         run: ./hack/teardown.sh
 
-      - name: Notify slack
-        if: ${{ always() }}
-        uses: rtCamp/action-slack-notify@v2
-        env:
-          SLACK_CHANNEL: team-quay-bots
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-          SLACK_COLOR: ${{ job.status }}
-          SLACK_TITLE: "${{ github.workflow }}: ${{ job.status }}"
-          SLACK_MESSAGE: |
-            * **Repo**:     ${{ github.repository }}
-            * **Workflow**: ${{ github.workflow }}
-            * **Result**:   ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      # - name: Notify slack
+      #   if: ${{ always() }}
+      #   uses: rtCamp/action-slack-notify@v2
+      #   env:
+      #     SLACK_CHANNEL: team-quay-bots
+      #     SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+      #     SLACK_COLOR: ${{ job.status }}
+      #     SLACK_TITLE: "${{ github.workflow }}: ${{ job.status }}"
+      #     SLACK_MESSAGE: |
+      #       * **Repo**:     ${{ github.repository }}
+      #       * **Workflow**: ${{ github.workflow }}
+      #       * **Result**:   ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
