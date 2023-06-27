@@ -58,6 +58,7 @@ function digest() {
 	ret=$(docker inspect --format='{{index .RepoDigests 0}}' "${IMAGE}")
 }
 
+docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 docker buildx build --push --platform "linux/amd64,linux/ppc64le,linux/s390x"  -t "${REGISTRY}/${NAMESPACE}/quay-operator:${TAG}" .
 digest "${REGISTRY}/${NAMESPACE}/quay-operator:${TAG}" OPERATOR_DIGEST
 
@@ -114,7 +115,7 @@ POWER_DIGEST=$(skopeo inspect --raw  docker://${REGISTRY}/${NAMESPACE}/quay-oper
                jq -r '.manifests[] | select(.platform.architecture == "ppc64le" and .platform.os == "linux").digest')
 Z_DIGEST=$(skopeo inspect --raw  docker://${REGISTRY}/${NAMESPACE}/quay-operator-bundle:${TAG} | \
            jq -r '.manifests[] | select(.platform.architecture == "s390x" and .platform.os == "linux").digest')
-        
+
 opm index add --build-tool docker --bundles "${REGISTRY}/${NAMESPACE}/quay-operator-bundle@${AMD64_DIGEST}" --tag "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-amd64"
 docker push "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-amd64"
 opm index add --build-tool docker --bundles "${REGISTRY}/${NAMESPACE}/quay-operator-bundle@${POWER_DIGEST}" --tag "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-ppc64le"
